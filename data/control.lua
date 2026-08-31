@@ -73,11 +73,11 @@ local function create_region(player, surface_index, area)
   -- rect_color is normalized to 0-1, even tho the mod settings gui is 0-255. convert to the latter.
   rect_color = {r = math.floor(255 * rect_color.r), g = math.floor(255 * rect_color.g), b = math.floor(255 * rect_color.b), a = math.floor(255 * rect_color.a)}
 
-  game.print(string.format("r=%.2f g=%.2f b=%.2f a=%.2f", rect_color.r, rect_color.g, rect_color.b, rect_color.a))
+  --game.print(string.format("r=%.2f g=%.2f b=%.2f a=%.2f", rect_color.r, rect_color.g, rect_color.b, rect_color.a))
 
   rect_color_trans = construct_region_color(rect_color)
 
-  game.print(string.format("r=%.2f g=%.2f b=%.2f a=%.2f", rect_color_trans.r, rect_color_trans.g, rect_color_trans.b, rect_color_trans.a))
+  --game.print(string.format("r=%.2f g=%.2f b=%.2f a=%.2f", rect_color_trans.r, rect_color_trans.g, rect_color_trans.b, rect_color_trans.a))
 
   local rect_filled = rendering.draw_rectangle{
     color = rect_color_trans,
