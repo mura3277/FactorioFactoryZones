@@ -1,7 +1,6 @@
 -- ------------------------------------------------------------
 -- show/hide-all button
 -- ------------------------------------------------------------
-
 function build_visibility_button(player)
   if player.gui.screen.region_visibility_button then return end
 
@@ -18,11 +17,9 @@ function set_all_regions_visible(visible)
   storage.regions_visible = visible
 
   for _, region in pairs(storage.regions) do
-    local rect_filled = rendering.get_object_by_id(region.filled_render_id)
-    if rect_filled and rect_filled.valid then rect_filled.visible = visible end
-
-	local rect_outline = rendering.get_object_by_id(region.outline_render_id)
-    if rect_outline and rect_outline.valid then rect_outline.visible = visible end
+    for _, l in pairs(region.lines) do
+      if l and l.valid then l.visible = visible end
+    end
 
     local text = rendering.get_object_by_id(region.text_render_id)
     if text and text.valid then text.visible = visible end
@@ -46,13 +43,8 @@ function construct_region_color(color_rect)
 end
 
 local function apply_region_color(region)
-  local rect_filled = rendering.get_object_by_id(region.filled_render_id)
-  if rect_filled and rect_filled.valid then
-	  rect_filled.color = construct_region_color(region.color)
-  end
-  local rect_outline = rendering.get_object_by_id(region.outline_render_id)
-  if rect_outline and rect_outline.valid then
-	  rect_outline.color = {r = region.color.r, g = region.color.g, b = region.color.b, 255}
+  for _, l in pairs(region.lines) do
+    if l and l.valid then l.color = {r = region.color.r, g = region.color.g, b = region.color.b, 255} end
   end
 end
 
@@ -67,7 +59,6 @@ end
 -- create/edit dialog - RGBA sliders, like the vanilla mod-settings
 -- color picker
 -- ------------------------------------------------------------
-
 local function add_channel_row(parent, region_id, channel, initial_value)
   local row = parent.add{type = "flow", direction = "horizontal"}
   row.style.vertical_align = "center"

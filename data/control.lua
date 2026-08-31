@@ -1,8 +1,6 @@
 require("gui")
 
 local TOOL_NAME = "region-marker-tool"
--- Click tolerance, rectangle color, and line width are player-adjustable
--- via settings.lua (Settings > Mod settings > Per Player in-game).
 
 local CHART_MODES = {
   [defines.render_mode.chart] = true,
@@ -34,25 +32,18 @@ script.on_nth_tick(30, function()
   end
 end)
 
-local function get_surface_index(event)
-  -- Defensive: different Factorio versions have used "surface_index"
-  -- (a number) or "surface" (a LuaSurface) on these events.
-  if event.surface_index then return event.surface_index end
-  if event.surface then return event.surface.index end
-  return 1
-end
-
 local function point_in_area(point, area)
   return point.x >= area.left_top.x and point.x <= area.right_bottom.x
     and point.y >= area.left_top.y and point.y <= area.right_bottom.y
 end
 
 local function find_region_at(surface_index, point)
-  for id, region in pairs(storage.regions) do
-    if region.surface_index == surface_index and point_in_area(point, region.area) then
-      return id, region
-    end
-  end
+  --for id, region in pairs(storage.regions) do
+  --  if region.surface_index == surface_index and point_in_area(point, region.area) then
+  --    return id, region
+  --  end
+  --end
+  --TODO refactor to points
   return nil
 end
 
@@ -73,32 +64,27 @@ local function create_region(player, surface_index, area)
   -- rect_color is normalized to 0-1, even tho the mod settings gui is 0-255. convert to the latter.
   rect_color = {r = math.floor(255 * rect_color.r), g = math.floor(255 * rect_color.g), b = math.floor(255 * rect_color.b), a = math.floor(255 * rect_color.a)}
 
-  --game.print(string.format("r=%.2f g=%.2f b=%.2f a=%.2f", rect_color.r, rect_color.g, rect_color.b, rect_color.a))
-
   rect_color_trans = construct_region_color(rect_color)
 
-  --game.print(string.format("r=%.2f g=%.2f b=%.2f a=%.2f", rect_color_trans.r, rect_color_trans.g, rect_color_trans.b, rect_color_trans.a))
+  -- construct 4 points from the 2 point click drag area table
+  points = {
+    a = {x1 = area.left_top.x, y1 = area.left_top.y, x2 = area.right_bottom.x, y2 = area.left_top.y},
+    b = {x1 = area.right_bottom.x, y1 = area.left_top.y, x2 = area.right_bottom.x, y2 = area.right_bottom.y},
+    c = {x1 = area.right_bottom.x, y1 = area.right_bottom.y, x2 = area.left_top.x, y2 = area.right_bottom.y},
+    d = {x1 = area.left_top.x, y1 = area.right_bottom.y, x2 = area.left_top.x, y2 = area.left_top.y},
+  }
 
-  local rect_filled = rendering.draw_rectangle{
-    color = rect_color_trans,
-    filled = true,
-    width = line_width,
-    left_top = area.left_top,
-    right_bottom = area.right_bottom,
-    surface = game.surfaces[surface_index],
-    render_mode = "chart",  -- only visible on the map view
-    visible = storage.regions_visible,
-  }
-  local rect_outline = rendering.draw_rectangle{
-    color = {r = rect_color.r, g = rect_color.g, b = rect_color.b, a = 255},
-    filled = false,
-    width = line_width,
-    left_top = area.left_top,
-    right_bottom = area.right_bottom,
-    surface = game.surfaces[surface_index],
-    render_mode = "chart",  -- only visible on the map view
-    visible = storage.regions_visible,
-  }
+  lines = {}
+  for _, p in pairs(points) do
+    table.insert(lines, rendering.draw_line{
+      color = {r = rect_color.r, g = rect_color.g, b = rect_color.b, a = 255},
+      width = line_width,
+      from = {p.x1, p.y1},
+      to = {p.x2, p.y2},
+      surface = game.surfaces[surface_index],
+      render_mode = "chart",
+    })
+  end
 
   local id = storage.next_region_id
   storage.next_region_id = id + 1
@@ -108,6 +94,7 @@ local function create_region(player, surface_index, area)
   local text = rendering.draw_text{
     text = name,
     color = {r = 255, g = 255, b = 255},
+    --TODO label pos needs to use the first point in points table instead of area
     target = label_position(area),
     surface = game.surfaces[surface_index],
     render_mode = "chart",
@@ -119,11 +106,10 @@ local function create_region(player, surface_index, area)
   storage.regions[id] = {
     name = name,
     color = rect_color,
-    filled_render_id = rect_filled.id,
-    outline_render_id = rect_outline.id,
+    lines = lines,
     text_render_id = text.id,
     surface_index = surface_index,
-    area = {left_top = area.left_top, right_bottom = area.right_bottom},
+    --area = {left_top = area.left_top, right_bottom = area.right_bottom},
   }
 
   open_region_dialog(player, id)
@@ -133,11 +119,9 @@ function destroy_region(region_id)
   local region = storage.regions[region_id]
   if not region then return end
 
-  local rect_filled = rendering.get_object_by_id(region.filled_render_id)
-  if rect_filled and rect_filled.valid then rect_filled.destroy() end
-
-  local rect_outline = rendering.get_object_by_id(region.outline_render_id)
-  if rect_outline and rect_outline.valid then rect_outline.destroy() end
+  for _, l in pairs(region.lines) do
+    if l and l.valid then l.destroy() end
+  end
 
   local text = rendering.get_object_by_id(region.text_render_id)
   if text and text.valid then text.destroy() end
@@ -148,7 +132,6 @@ end
 -- ------------------------------------------------------------
 -- selection tool: click to edit, drag to create
 -- ------------------------------------------------------------
-
 script.on_event(defines.events.on_player_selected_area, function(event)
   if event.item ~= TOOL_NAME then return end
 
@@ -157,7 +140,6 @@ script.on_event(defines.events.on_player_selected_area, function(event)
     return  -- ignore drags/clicks while the create/edit dialog is open
   end
 
-  local surface_index = get_surface_index(event)
   local area = event.area
   local width = area.right_bottom.x - area.left_top.x
   local height = area.right_bottom.y - area.left_top.y
@@ -169,7 +151,7 @@ script.on_event(defines.events.on_player_selected_area, function(event)
       x = (area.left_top.x + area.right_bottom.x) / 2,
       y = (area.left_top.y + area.right_bottom.y) / 2,
     }
-    local id = find_region_at(surface_index, point)
+    local id = find_region_at(event.surface.index, point)
     if id then
       open_region_dialog(player, id)  -- defined in gui.lua
     end
@@ -177,5 +159,5 @@ script.on_event(defines.events.on_player_selected_area, function(event)
   end
 
   -- A real drag: create a new region and immediately prompt for a name.
-  create_region(player, surface_index, area)
+  create_region(player, event.surface.index, area)
 end)
