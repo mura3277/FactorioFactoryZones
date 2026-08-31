@@ -129,7 +129,6 @@ local function create_region(player, surface_index, area)
   open_region_dialog(player, id)
 end
 
--- Global (not local) so gui.lua's Delete button can call it.
 function destroy_region(region_id)
   local region = storage.regions[region_id]
   if not region then return end
@@ -153,11 +152,15 @@ end
 script.on_event(defines.events.on_player_selected_area, function(event)
   if event.item ~= TOOL_NAME then return end
 
+  local player = game.get_player(event.player_index)
+  if player.gui.screen.region_edit_dialog then
+    return  -- ignore drags/clicks while the create/edit dialog is open
+  end
+
   local surface_index = get_surface_index(event)
   local area = event.area
   local width = area.right_bottom.x - area.left_top.x
   local height = area.right_bottom.y - area.left_top.y
-  local player = game.get_player(event.player_index)
   local click_tolerance = player.mod_settings["region-marker-click-tolerance"].value
 
   if width <= click_tolerance and height <= click_tolerance then
