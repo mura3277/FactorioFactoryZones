@@ -114,7 +114,10 @@ function open_region_dialog(player, region_id)
   frame.auto_center = true
   player.opened = frame
 
-  local name_field = frame.add{
+  local name_row = frame.add{type = "flow", direction = "horizontal"}
+  name_row.style.vertical_align = "center"
+
+  local name_field = name_row.add{
     type = "textfield",
     text = region.name,
     tags = {action = "rename_region", region_id = region_id},
@@ -122,6 +125,14 @@ function open_region_dialog(player, region_id)
   name_field.style.width = 200
   name_field.focus()
   name_field.select_all()
+
+  name_row.add{
+    type = "sprite-button",
+    sprite = "utility/trash",
+    style = "tool_button_red",  -- small red icon button, same style vanilla uses for delete actions
+    tooltip = "Delete region",
+    tags = {action = "delete_region", region_id = region_id},
+  }
 
   local color_frame = frame.add{
     type = "frame",
@@ -138,13 +149,10 @@ function open_region_dialog(player, region_id)
   local button_row = frame.add{type = "flow"}
   button_row.style.top_margin = 6
   button_row.add{
-    type = "button",
-    caption = "Delete",
-    tags = {action = "delete_region", region_id = region_id},
-  }
-  button_row.add{
-    type = "button",
-    caption = "Done",
+    type = "sprite-button",
+    sprite = "utility/enter",
+    style = "tool_button_green",  -- dark green icon button, same style vanilla confirm actions use
+    tooltip = "Done",
     tags = {action = "close_region_dialog"},
   }
 end
