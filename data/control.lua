@@ -63,7 +63,8 @@ end
 -- ------------------------------------------------------------
 -- region create/destroy
 -- ------------------------------------------------------------
-local function create_rect(line_width, rect_color, surface_index, points)
+local function create_rect(player, rect_color, surface_index, points)
+  local line_width = player.mod_settings["region-marker-line-width"].value
   -- construct 4 pairs of points from the 4 point click drag points table
   line_points = {
     {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
@@ -91,7 +92,6 @@ local function create_rect(line_width, rect_color, surface_index, points)
 end
 
 local function create_region(player, surface_index, points)
-  local line_width = player.mod_settings["region-marker-line-width"].value
   local rect_color = player.mod_settings["region-marker-rectangle-color"].value
 
   -- rect_color is normalized to 0-1, even tho the mod settings gui is 0-255. convert to the latter.
@@ -100,7 +100,7 @@ local function create_region(player, surface_index, points)
   --TODO
   rect_color_transparent = construct_region_color(rect_color)
 
-  rect = create_rect(line_width, rect_color, surface_index, points)
+  rect = create_rect(player, rect_color, surface_index, points)
 
   local id = storage.next_region_id
   storage.next_region_id = id + 1
@@ -145,6 +145,47 @@ function destroy_region(region_id)
   storage.regions[region_id] = nil
 end
 
+local function points_intersect_region(points)
+  valid_points = {}
+  last_valid_region_id = -1
+  region_count = 0
+  for id, region in pairs(storage.regions) do
+    count = 0
+    for _, p in pairs(points) do
+      if point_in_region(p, region) then
+        table.insert(valid_points, p)
+        count = count + 1
+      end
+      -- if we have enough intersections, store region id
+      if count == 2 then
+        -- early escape if new drag covers multiple regions
+        if region_count > 0 and last_valid_region_id ~= id then
+          game.print(string.format("s=%s", "covers multiple regions. no action."))
+          return nil
+        end
+        region_count = region_count + 1
+        last_valid_region_id = id
+      -- all points of the new rect fall within the region. no action should be taken
+      elseif count == 4 then
+        game.print(string.format("s=%s", "falls within region. no action."))
+        return nil
+      end
+    end
+  end
+  -- check if we had a valid region
+  if last_valid_region_id ~= -1 then
+    game.print(string.format("s=%s", "valid intersection"))
+    game.print(serpent.block(valid_points))
+    return {
+      valid_points = valid_points,
+      last_valid_region_id = last_valid_region_id
+    }
+  else
+    game.print(string.format("s=%s", "not enough points intersecting. no action."))
+    return nil
+  end
+end
+
 -- ------------------------------------------------------------
 -- selection tool: click to edit, drag to create
 -- ------------------------------------------------------------
@@ -181,8 +222,13 @@ script.on_event(defines.events.on_player_selected_area, function(event)
   }
 
   -- test if the drag intersects with an existing region
-
-
-  -- A real drag: create a new region and immediately prompt for a name.
-  create_region(player, event.surface.index, points)
+  intersection = points_intersect_region(points)
+  if intersection then
+    -- merge new rect with existing region
+    region = storage.regions[intersection.last_valid_region_id]
+    table.insert(region.rects, create_rect(player, region.color, event.surface.index, points))
+  else
+    -- create a new region and immediately prompt for a name.
+    create_region(player, event.surface.index, points)
+  end
 end)

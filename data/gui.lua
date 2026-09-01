@@ -38,7 +38,6 @@ end
 -- ------------------------------------------------------------
 function construct_region_color(color_rect)
   alpha = color_rect.a / 255
-  game.print(string.format("a=%.2f", alpha))
   return {r = math.floor(color_rect.r * alpha), g = math.floor(color_rect.g * alpha), b = math.floor(color_rect.b * alpha), a = color_rect.a}
 end
 
