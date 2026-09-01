@@ -32,14 +32,14 @@ script.on_nth_tick(30, function()
   end
 end)
 
-local function point_in_area(point, area)
-  return point.x >= area.tl.x and point.x <= area.br.x
-    and point.y >= area.tl.y and point.y <= area.br.y
+local function point_in_area(point, points)
+  return point.x >= points.left_top.x and point.x <= points.right_bottom.x
+    and point.y >= points.left_top.y and point.y <= points.right_bottom.y
 end
 
 local function point_in_region(point, region)
   for _, r in pairs(region.rects) do
-    if point_in_area(point, {tl = r.points.tl, br = r.points.br}) then return true end
+    if point_in_area(point, r.points) then return true end
   end
   return false
 end
@@ -53,23 +53,23 @@ local function find_region_at(surface_index, point)
   return nil
 end
 
-local function label_position(area)
+local function label_position(points)
   return {
-    x = (area.left_top.x + area.right_bottom.x) / 2,
-    y = area.left_top.y - 0.5,  -- just above the top edge of the rectangle
+    x = (points.left_top.x + points.right_bottom.x) / 2,
+    y = points.left_top.y - 0.5,  -- just above the top edge of the rectangle
   }
 end
 
 -- ------------------------------------------------------------
 -- region create/destroy
 -- ------------------------------------------------------------
-local function create_rect(line_width, rect_color, surface_index, area)
-  -- construct 4 points from the 2 point click drag area table
+local function create_rect(line_width, rect_color, surface_index, points)
+  -- construct 4 pairs of points from the 4 point click drag points table
   line_points = {
-    {x1 = area.left_top.x, y1 = area.left_top.y, x2 = area.right_bottom.x, y2 = area.left_top.y},
-    {x1 = area.right_bottom.x, y1 = area.left_top.y, x2 = area.right_bottom.x, y2 = area.right_bottom.y},
-    {x1 = area.right_bottom.x, y1 = area.right_bottom.y, x2 = area.left_top.x, y2 = area.right_bottom.y},
-    {x1 = area.left_top.x, y1 = area.right_bottom.y, x2 = area.left_top.x, y2 = area.left_top.y},
+    {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
+    {x1 = points.right_bottom.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.right_bottom.y},
+    {x1 = points.right_bottom.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.right_bottom.y},
+    {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y},
   }
 
   lines = {}
@@ -86,16 +86,11 @@ local function create_rect(line_width, rect_color, surface_index, area)
 
   return {
     lines = lines,
-    points = {
-      tl = {x = area.left_top.x, y = area.left_top.y},
-      tr = {x = area.right_bottom.x, y = area.left_top.y},
-      br = {x = area.right_bottom.x, y = area.right_bottom.y},
-      bl = {x = area.left_top.x, y = area.right_bottom.y},
-    }
+    points = points
   }
 end
 
-local function create_region(player, surface_index, area)
+local function create_region(player, surface_index, points)
   local line_width = player.mod_settings["region-marker-line-width"].value
   local rect_color = player.mod_settings["region-marker-rectangle-color"].value
 
@@ -105,7 +100,7 @@ local function create_region(player, surface_index, area)
   --TODO
   rect_color_transparent = construct_region_color(rect_color)
 
-  rect = create_rect(line_width, rect_color, surface_index, area)
+  rect = create_rect(line_width, rect_color, surface_index, points)
 
   local id = storage.next_region_id
   storage.next_region_id = id + 1
@@ -116,7 +111,7 @@ local function create_region(player, surface_index, area)
     text = name,
     color = {r = 255, g = 255, b = 255},
     --TODO label pos needs to use the first point in points table instead of area
-    target = label_position(area),
+    target = label_position(points),
     surface = game.surfaces[surface_index],
     render_mode = "chart",
     alignment = "center",
@@ -177,6 +172,17 @@ script.on_event(defines.events.on_player_selected_area, function(event)
     return
   end
 
+  -- construct all 4 bounds from a 2 point bounding box
+  points = {
+      left_top = {x = area.left_top.x, y = area.left_top.y},
+      right_top = {x = area.right_bottom.x, y = area.left_top.y},
+      right_bottom = {x = area.right_bottom.x, y = area.right_bottom.y},
+      left_bottom = {x = area.left_top.x, y = area.right_bottom.y},
+  }
+
+  -- test if the drag intersects with an existing region
+
+
   -- A real drag: create a new region and immediately prompt for a name.
-  create_region(player, event.surface.index, area)
+  create_region(player, event.surface.index, points)
 end)
