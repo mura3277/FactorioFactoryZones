@@ -38,7 +38,10 @@ local function point_in_area(point, area)
 end
 
 local function point_in_region(point, region)
-  return point_in_area(point, {tl = region.points.tl, br = region.points.br})
+  for _, r in pairs(region.rects) do
+    if point_in_area(point, {tl = r.points.tl, br = r.points.br}) then return true end
+  end
+  return false
 end
 
 local function find_region_at(surface_index, point)
@@ -60,15 +63,7 @@ end
 -- ------------------------------------------------------------
 -- region create/destroy
 -- ------------------------------------------------------------
-local function create_region(player, surface_index, area)
-  local rect_color = player.mod_settings["region-marker-rectangle-color"].value
-  local line_width = player.mod_settings["region-marker-line-width"].value
-
-  -- rect_color is normalized to 0-1, even tho the mod settings gui is 0-255. convert to the latter.
-  rect_color = {r = math.floor(255 * rect_color.r), g = math.floor(255 * rect_color.g), b = math.floor(255 * rect_color.b), a = math.floor(255 * rect_color.a)}
-
-  rect_color_trans = construct_region_color(rect_color)
-
+local function create_rect(line_width, rect_color, surface_index, area)
   -- construct 4 points from the 2 point click drag area table
   line_points = {
     {x1 = area.left_top.x, y1 = area.left_top.y, x2 = area.right_bottom.x, y2 = area.left_top.y},
@@ -89,6 +84,29 @@ local function create_region(player, surface_index, area)
     })
   end
 
+  return {
+    lines = lines,
+    points = {
+      tl = {x = area.left_top.x, y = area.left_top.y},
+      tr = {x = area.right_bottom.x, y = area.left_top.y},
+      br = {x = area.right_bottom.x, y = area.right_bottom.y},
+      bl = {x = area.left_top.x, y = area.right_bottom.y},
+    }
+  }
+end
+
+local function create_region(player, surface_index, area)
+  local line_width = player.mod_settings["region-marker-line-width"].value
+  local rect_color = player.mod_settings["region-marker-rectangle-color"].value
+
+  -- rect_color is normalized to 0-1, even tho the mod settings gui is 0-255. convert to the latter.
+  rect_color = {r = math.floor(255 * rect_color.r), g = math.floor(255 * rect_color.g), b = math.floor(255 * rect_color.b), a = math.floor(255 * rect_color.a)}
+
+  --TODO
+  rect_color_transparent = construct_region_color(rect_color)
+
+  rect = create_rect(line_width, rect_color, surface_index, area)
+
   local id = storage.next_region_id
   storage.next_region_id = id + 1
   local name = "Region " .. id
@@ -106,20 +124,13 @@ local function create_region(player, surface_index, area)
     visible = storage.regions_visible,
   }
 
-  local points = {
-      tl = {x = area.left_top.x, y = area.left_top.y},
-      tr = {x = area.right_bottom.x, y = area.left_top.y},
-      br = {x = area.right_bottom.x, y = area.right_bottom.y},
-      bl = {x = area.left_top.x, y = area.right_bottom.y},
-  }
-
   storage.regions[id] = {
     name = name,
     color = rect_color,
     lines = lines,
     text_render_id = text.id,
     surface_index = surface_index,
-    points = points,
+    rects = {rect},
   }
 
   open_region_dialog(player, id)
