@@ -17,8 +17,10 @@ function set_all_regions_visible(visible)
   storage.regions_visible = visible
 
   for _, region in pairs(storage.regions) do
-    for _, l in pairs(region.lines) do
-      if l and l.valid then l.visible = visible end
+    for _, r in pairs(region.rects) do
+      for _, l in pairs(r.lines) do
+        if l and l.valid then l.visible = visible end
+      end
     end
 
     local text = rendering.get_object_by_id(region.text_render_id)
@@ -42,8 +44,10 @@ function construct_region_color(color_rect)
 end
 
 local function apply_region_color(region)
-  for _, l in pairs(region.lines) do
-    if l and l.valid then l.color = {r = region.color.r, g = region.color.g, b = region.color.b, 255} end
+  for _, r in pairs(region.rects) do
+    for _, l in pairs(r.lines) do
+      if l and l.valid then l.color = {r = region.color.r, g = region.color.g, b = region.color.b, 255} end
+    end
   end
 end
 

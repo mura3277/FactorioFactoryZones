@@ -122,7 +122,6 @@ local function create_region(player, surface_index, points)
   storage.regions[id] = {
     name = name,
     color = rect_color,
-    lines = lines,
     text_render_id = text.id,
     surface_index = surface_index,
     rects = {rect},
@@ -135,8 +134,10 @@ function destroy_region(region_id)
   local region = storage.regions[region_id]
   if not region then return end
 
-  for _, l in pairs(region.lines) do
-    if l and l.valid then l.destroy() end
+  for _, r in pairs(region.rects) do
+    for _, l in pairs(r.lines) do
+      if l and l.valid then l.destroy() end
+    end
   end
 
   local text = rendering.get_object_by_id(region.text_render_id)
