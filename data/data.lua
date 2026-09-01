@@ -1,6 +1,4 @@
 data:extend({
-	-- The tool itself. Holding it and dragging works just like the
-	-- deconstruction planner: drag to mark, alt-drag to unmark.
 	{
 		type = "selection-tool",
 		name = "region-marker-tool",
@@ -25,10 +23,6 @@ data:extend({
 			mode = {"nothing"},
 		},
 	},
-
-	-- Shortcut-bar button, exactly like the deconstruction planner's:
-	-- clicking it puts the tool straight into your cursor. No control.lua
-	-- code needed for this part - action = "spawn-item" handles it.
 	{
 		type = "shortcut",
 		name = "give-region-marker-tool",

@@ -1,6 +1,3 @@
--- ------------------------------------------------------------
--- show/hide-all button
--- ------------------------------------------------------------
 function build_visibility_button(player)
   if player.gui.screen.region_visibility_button then return end
 
@@ -13,7 +10,7 @@ function build_visibility_button(player)
   button.visible = false  -- the on_nth_tick poller in control.lua turns this on/off
 end
 
-function set_all_regions_visible(visible)
+local function set_all_regions_visible(visible)
   storage.regions_visible = visible
 
   for _, region in pairs(storage.regions) do
@@ -35,11 +32,8 @@ function set_all_regions_visible(visible)
   end
 end
 
--- ------------------------------------------------------------
--- color application + preview
--- ------------------------------------------------------------
 function construct_region_color(color_rect)
-  alpha = color_rect.a / 255
+  local alpha = color_rect.a / 255
   return {r = math.floor(color_rect.r * alpha), g = math.floor(color_rect.g * alpha), b = math.floor(color_rect.b * alpha), a = color_rect.a}
 end
 
@@ -58,10 +52,6 @@ local function refresh_color_preview(player, region)
   end
 end
 
--- ------------------------------------------------------------
--- create/edit dialog - RGBA sliders, like the vanilla mod-settings
--- color picker
--- ------------------------------------------------------------
 local function add_channel_row(parent, region_id, channel, initial_value)
   local row = parent.add{type = "flow", direction = "horizontal"}
   row.style.vertical_align = "center"
@@ -150,12 +140,6 @@ function open_region_dialog(player, region_id)
     tags = {action = "close_region_dialog"},
   }
 end
-
--- ------------------------------------------------------------
--- gui event handlers (one handler per event - Factorio only keeps
--- the last script.on_event registration for a given event, so all
--- gui handling has to live in these single functions)
--- ------------------------------------------------------------
 
 script.on_event(defines.events.on_gui_click, function(event)
   local element = event.element
