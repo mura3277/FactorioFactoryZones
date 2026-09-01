@@ -33,17 +33,20 @@ script.on_nth_tick(30, function()
 end)
 
 local function point_in_area(point, area)
-  return point.x >= area.left_top.x and point.x <= area.right_bottom.x
-    and point.y >= area.left_top.y and point.y <= area.right_bottom.y
+  return point.x >= area.tl.x and point.x <= area.br.x
+    and point.y >= area.tl.y and point.y <= area.br.y
+end
+
+local function point_in_region(point, region)
+  return point_in_area(point, {tl = region.points.tl, br = region.points.br})
 end
 
 local function find_region_at(surface_index, point)
-  --for id, region in pairs(storage.regions) do
-  --  if region.surface_index == surface_index and point_in_area(point, region.area) then
-  --    return id, region
-  --  end
-  --end
-  --TODO refactor to points
+  for id, region in pairs(storage.regions) do
+    if region.surface_index == surface_index and point_in_region(point, region) then
+      return id, region
+    end
+  end
   return nil
 end
 
@@ -67,15 +70,15 @@ local function create_region(player, surface_index, area)
   rect_color_trans = construct_region_color(rect_color)
 
   -- construct 4 points from the 2 point click drag area table
-  points = {
-    a = {x1 = area.left_top.x, y1 = area.left_top.y, x2 = area.right_bottom.x, y2 = area.left_top.y},
-    b = {x1 = area.right_bottom.x, y1 = area.left_top.y, x2 = area.right_bottom.x, y2 = area.right_bottom.y},
-    c = {x1 = area.right_bottom.x, y1 = area.right_bottom.y, x2 = area.left_top.x, y2 = area.right_bottom.y},
-    d = {x1 = area.left_top.x, y1 = area.right_bottom.y, x2 = area.left_top.x, y2 = area.left_top.y},
+  line_points = {
+    {x1 = area.left_top.x, y1 = area.left_top.y, x2 = area.right_bottom.x, y2 = area.left_top.y},
+    {x1 = area.right_bottom.x, y1 = area.left_top.y, x2 = area.right_bottom.x, y2 = area.right_bottom.y},
+    {x1 = area.right_bottom.x, y1 = area.right_bottom.y, x2 = area.left_top.x, y2 = area.right_bottom.y},
+    {x1 = area.left_top.x, y1 = area.right_bottom.y, x2 = area.left_top.x, y2 = area.left_top.y},
   }
 
   lines = {}
-  for _, p in pairs(points) do
+  for _, p in pairs(line_points) do
     table.insert(lines, rendering.draw_line{
       color = {r = rect_color.r, g = rect_color.g, b = rect_color.b, a = 255},
       width = line_width,
@@ -103,13 +106,20 @@ local function create_region(player, surface_index, area)
     visible = storage.regions_visible,
   }
 
+  local points = {
+      tl = {x = area.left_top.x, y = area.left_top.y},
+      tr = {x = area.right_bottom.x, y = area.left_top.y},
+      br = {x = area.right_bottom.x, y = area.right_bottom.y},
+      bl = {x = area.left_top.x, y = area.right_bottom.y},
+  }
+
   storage.regions[id] = {
     name = name,
     color = rect_color,
     lines = lines,
     text_render_id = text.id,
     surface_index = surface_index,
-    --area = {left_top = area.left_top, right_bottom = area.right_bottom},
+    points = points,
   }
 
   open_region_dialog(player, id)
@@ -136,9 +146,7 @@ script.on_event(defines.events.on_player_selected_area, function(event)
   if event.item ~= TOOL_NAME then return end
 
   local player = game.get_player(event.player_index)
-  if player.gui.screen.region_edit_dialog then
-    return  -- ignore drags/clicks while the create/edit dialog is open
-  end
+  if player.gui.screen.region_edit_dialog then return end
 
   local area = event.area
   local width = area.right_bottom.x - area.left_top.x
