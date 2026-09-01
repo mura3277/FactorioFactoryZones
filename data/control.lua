@@ -63,15 +63,17 @@ end
 -- ------------------------------------------------------------
 -- region create/destroy
 -- ------------------------------------------------------------
-local function create_rect(player, rect_color, surface_index, points)
+local function create_rect(player, rect_color, surface_index, points, line_points)
   local line_width = player.mod_settings["region-marker-line-width"].value
   -- construct 4 pairs of points from the 4 point click drag points table
-  line_points = {
-    {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
-    {x1 = points.right_bottom.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.right_bottom.y},
-    {x1 = points.right_bottom.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.right_bottom.y},
-    {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y},
-  }
+  if line_points == nil then
+    line_points = {
+      {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
+      {x1 = points.right_bottom.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.right_bottom.y},
+      {x1 = points.right_bottom.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.right_bottom.y},
+      {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y},
+    }
+  end
 
   lines = {}
   for _, p in pairs(line_points) do
@@ -87,7 +89,8 @@ local function create_rect(player, rect_color, surface_index, points)
 
   return {
     lines = lines,
-    points = points
+    points = points,
+    line_points = line_points
   }
 end
 
@@ -100,7 +103,7 @@ local function create_region(player, surface_index, points)
   --TODO
   rect_color_transparent = construct_region_color(rect_color)
 
-  rect = create_rect(player, rect_color, surface_index, points)
+  rect = create_rect(player, rect_color, surface_index, points, nil)
 
   local id = storage.next_region_id
   storage.next_region_id = id + 1
@@ -162,14 +165,22 @@ local function points_intersect_region(points)
         -- early escape if new drag covers multiple regions
         if region_count > 0 and last_valid_region_id ~= id then
           game.print(string.format("s=%s", "covers multiple regions. no action."))
-          return nil
+          return {
+            valid_points = nil,
+            last_valid_region_id = nil,
+            state = -1
+          }
         end
         region_count = region_count + 1
         last_valid_region_id = id
       -- all points of the new rect fall within the region. no action should be taken
       elseif count == 4 then
         game.print(string.format("s=%s", "falls within region. no action."))
-        return nil
+        return {
+          valid_points = nil,
+          last_valid_region_id = nil,
+          state = -1
+        }
       end
     end
   end
@@ -179,11 +190,25 @@ local function points_intersect_region(points)
     game.print(serpent.block(valid_points))
     return {
       valid_points = valid_points,
-      last_valid_region_id = last_valid_region_id
+      last_valid_region_id = last_valid_region_id,
+      state = 1
     }
   else
     game.print(string.format("s=%s", "not enough points intersecting. no action."))
-    return nil
+    return {
+      valid_points = valid_points,
+      last_valid_region_id = last_valid_region_id,
+      state = 0
+    }
+  end
+end
+
+local function remove_line_if_in_region(line_points, region)
+  for i, lp in pairs(line_points) do
+    game.print(serpent.block(l))
+    if point_in_region({x = lp.x1, y = lp.y1}, region) and point_in_region({x = lp.x2, y = lp.y2}, region) then
+      table.remove(line_points, i)
+    end
   end
 end
 
@@ -224,12 +249,25 @@ script.on_event(defines.events.on_player_selected_area, function(event)
 
   -- test if the drag intersects with an existing region
   intersection = points_intersect_region(points)
-  if intersection then
+
+  -- valid intersection
+  if intersection.state == 1 then
     -- merge new rect with existing region
     region = storage.regions[intersection.last_valid_region_id]
-    table.insert(region.rects, create_rect(player, region.color, event.surface.index, points))
-  else
+    line_points = {
+      {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
+      {x1 = points.right_bottom.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.right_bottom.y},
+      {x1 = points.right_bottom.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.right_bottom.y},
+      {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y},
+    }
+
+    remove_line_if_in_region(line_points, region)
+
+    rect = create_rect(player, region.color, event.surface.index, points, line_points)
+
+    table.insert(region.rects, rect)
+  elseif intersection.state == 0 then
     -- create a new region and immediately prompt for a name.
     create_region(player, event.surface.index, points)
-  end
+  else return end
 end)
