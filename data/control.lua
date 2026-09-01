@@ -1,259 +1,291 @@
 require("gui")
 
-script.on_init(function()
-  storage.regions = {}
-  storage.next_region_id = 1
-  storage.regions_visible = true
+script.on_init(
+    function()
+        storage.regions = {}
+        storage.next_region_id = 1
+        storage.regions_visible = true
 
-  for _, player in pairs(game.players) do
-    build_visibility_button(player)
-  end
-end)
+        for _, player in pairs(game.players) do
+            build_visibility_button(player)
+        end
+    end
+)
 
-script.on_event(defines.events.on_player_created, function(event)
-  build_visibility_button(game.get_player(event.player_index))
-end)
+script.on_event(
+    defines.events.on_player_created,
+    function(event)
+        build_visibility_button(game.get_player(event.player_index))
+    end
+)
 
 -- Poll twice a second: the engine has no "map opened/closed" event, so
 -- this is the standard way to react to the player's current view.
-script.on_nth_tick(30, function()
-  for _, player in pairs(game.connected_players) do
-    if not player.gui.screen.region_visibility_button then
-      build_visibility_button(player)  -- self-heals if on_init/on_player_created never ran for this player
+script.on_nth_tick(
+    30,
+    function()
+        for _, player in pairs(game.connected_players) do
+            if not player.gui.screen.region_visibility_button then
+                build_visibility_button(player) -- self-heals if on_init/on_player_created never ran for this player
+            end
+            player.gui.screen.region_visibility_button.visible =
+                (player.render_mode == defines.render_mode.chart) or false
+        end
     end
-    player.gui.screen.region_visibility_button.visible = (player.render_mode == defines.render_mode.chart) or false
-  end
-end)
+)
 
 local function point_in_area(point, points)
-  return point.x >= points.left_top.x and point.x <= points.right_bottom.x
-    and point.y >= points.left_top.y and point.y <= points.right_bottom.y
+    return point.x >= points.left_top.x and point.x <= points.right_bottom.x and point.y >= points.left_top.y and
+        point.y <= points.right_bottom.y
 end
 
 local function point_in_region(point, region)
-  for _, r in pairs(region.rects) do
-    if point_in_area(point, r.points) then return true end
-  end
-  return false
+    for _, r in pairs(region.rects) do
+        if point_in_area(point, r.points) then
+            return true
+        end
+    end
+    return false
 end
 
 local function find_region_at(surface_index, point)
-  for id, region in pairs(storage.regions) do
-    if region.surface_index == surface_index and point_in_region(point, region) then
-      return id, region
+    for id, region in pairs(storage.regions) do
+        if region.surface_index == surface_index and point_in_region(point, region) then
+            return id, region
+        end
     end
-  end
-  return nil
+    return nil
 end
 
 local function label_position(points)
-  return {
-    x = (points.left_top.x + points.right_bottom.x) / 2,
-    y = points.left_top.y - 0.5,  -- just above the top edge of the rectangle
-  }
+    return {
+        x = (points.left_top.x + points.right_bottom.x) / 2,
+        y = points.left_top.y - 0.5 -- just above the top edge of the rectangle
+    }
 end
 
 local function create_rect(player, rect_color, surface_index, points, line_points)
-  local line_width = player.mod_settings["region-marker-line-width"].value
-  -- construct 4 pairs of points from the 4 point click drag points table
-  if line_points == nil then
-    line_points = {
-      {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
-      {x1 = points.right_bottom.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.right_bottom.y},
-      {x1 = points.right_bottom.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.right_bottom.y},
-      {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y},
+    local line_width = player.mod_settings["region-marker-line-width"].value
+    -- construct 4 pairs of points from the 4 point click drag points table
+    if line_points == nil then
+        line_points = {
+            {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
+            {x1 = points.right_bottom.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.right_bottom.y},
+            {x1 = points.right_bottom.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.right_bottom.y},
+            {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y}
+        }
+    end
+
+    local lines = {}
+    for _, p in pairs(line_points) do
+        table.insert(
+            lines,
+            rendering.draw_line {
+                color = {r = rect_color.r, g = rect_color.g, b = rect_color.b, a = 255},
+                width = line_width,
+                from = {p.x1, p.y1},
+                to = {p.x2, p.y2},
+                surface = game.surfaces[surface_index],
+                render_mode = "chart"
+            }
+        )
+    end
+
+    return {
+        lines = lines,
+        points = points,
+        line_points = line_points
     }
-  end
-
-  local lines = {}
-  for _, p in pairs(line_points) do
-    table.insert(lines, rendering.draw_line{
-      color = {r = rect_color.r, g = rect_color.g, b = rect_color.b, a = 255},
-      width = line_width,
-      from = {p.x1, p.y1},
-      to = {p.x2, p.y2},
-      surface = game.surfaces[surface_index],
-      render_mode = "chart",
-    })
-  end
-
-  return {
-    lines = lines,
-    points = points,
-    line_points = line_points
-  }
 end
 
 local function create_region(player, surface_index, points)
-  local rect_color = player.mod_settings["region-marker-rectangle-color"].value
+    local rect_color = player.mod_settings["region-marker-rectangle-color"].value
 
-  -- rect_color is normalized to 0-1, even tho the mod settings gui is 0-255. convert to the latter.
-  rect_color = {r = math.floor(255 * rect_color.r), g = math.floor(255 * rect_color.g), b = math.floor(255 * rect_color.b), a = math.floor(255 * rect_color.a)}
+    -- rect_color is normalized to 0-1, even tho the mod settings gui is 0-255. convert to the latter.
+    rect_color = {
+        r = math.floor(255 * rect_color.r),
+        g = math.floor(255 * rect_color.g),
+        b = math.floor(255 * rect_color.b),
+        a = math.floor(255 * rect_color.a)
+    }
 
-  --TODO
-  local rect_color_transparent = construct_region_color(rect_color)
+    --TODO
+    local rect_color_transparent = construct_region_color(rect_color)
 
-  local rect = create_rect(player, rect_color, surface_index, points, nil)
+    local rect = create_rect(player, rect_color, surface_index, points, nil)
 
-  local id = storage.next_region_id
-  storage.next_region_id = id + 1
-  local name = "Region " .. id
+    local id = storage.next_region_id
+    storage.next_region_id = id + 1
+    local name = "Region " .. id
 
-  local text_scale = player.mod_settings["region-marker-text-scale"].value
-  local text = rendering.draw_text{
-    text = name,
-    color = {r = 255, g = 255, b = 255},
-    --TODO label pos needs to use the first point in points table instead of area
-    target = label_position(points),
-    surface = game.surfaces[surface_index],
-    render_mode = "chart",
-    alignment = "center",
-    scale = text_scale,
-    visible = storage.regions_visible,
-  }
+    local text_scale = player.mod_settings["region-marker-text-scale"].value
+    local text =
+        rendering.draw_text {
+        text = name,
+        color = {r = 255, g = 255, b = 255},
+        --TODO label pos needs to use the first point in points table instead of area
+        target = label_position(points),
+        surface = game.surfaces[surface_index],
+        render_mode = "chart",
+        alignment = "center",
+        scale = text_scale,
+        visible = storage.regions_visible
+    }
 
-  storage.regions[id] = {
-    name = name,
-    color = rect_color,
-    text_render_id = text.id,
-    surface_index = surface_index,
-    rects = {rect},
-  }
+    storage.regions[id] = {
+        name = name,
+        color = rect_color,
+        text_render_id = text.id,
+        surface_index = surface_index,
+        rects = {rect}
+    }
 
-  open_region_dialog(player, id)
+    open_region_dialog(player, id)
 end
 
 function destroy_region(region_id)
-  local region = storage.regions[region_id]
-  if not region then return end
+    local region = storage.regions[region_id]
+    if not region then return end
 
-  for _, r in pairs(region.rects) do
-    for _, l in pairs(r.lines) do
-      if l and l.valid then l.destroy() end
+    for _, r in pairs(region.rects) do
+        for _, l in pairs(r.lines) do
+            if l and l.valid then l.destroy() end
+        end
     end
-  end
 
-  local text = rendering.get_object_by_id(region.text_render_id)
-  if text and text.valid then text.destroy() end
+    local text = rendering.get_object_by_id(region.text_render_id)
+    if text and text.valid then text.destroy() end
 
-  storage.regions[region_id] = nil
+    storage.regions[region_id] = nil
 end
 
 local function points_intersect_region(points)
-  local valid_points = {}
-  local last_valid_region_id = -1
-  local region_count = 0
-  for id, region in pairs(storage.regions) do
-    local count = 0
-    for _, p in pairs(points) do
-      if point_in_region(p, region) then
-        table.insert(valid_points, p)
-        count = count + 1
-      end
-      -- if we have enough intersections, store region id
-      if count == 2 then
-        -- early escape if new drag covers multiple regions
-        if region_count > 0 and last_valid_region_id ~= id then
-          game.print(string.format("s=%s", "covers multiple regions. no action."))
-          return {
-            valid_points = nil,
-            last_valid_region_id = nil,
-            state = -1
-          }
+    local valid_points = {}
+    local last_valid_region_id = -1
+    local region_count = 0
+    for id, region in pairs(storage.regions) do
+        local count = 0
+        for _, p in pairs(points) do
+            if point_in_region(p, region) then
+                table.insert(valid_points, p)
+                count = count + 1
+            end
+            -- if we have enough intersections, store region id
+            if count == 2 then
+                -- all points of the new rect fall within the region. no action should be taken
+                -- early escape if new drag covers multiple regions
+                if region_count > 0 and last_valid_region_id ~= id then
+                    game.print(string.format("s=%s", "covers multiple regions. no action."))
+                    return {
+                        valid_points = nil,
+                        last_valid_region_id = nil,
+                        state = -1
+                    }
+                end
+                region_count = region_count + 1
+                last_valid_region_id = id
+            elseif count == 4 then
+                game.print(string.format("s=%s", "falls within region. no action."))
+                return {
+                    valid_points = nil,
+                    last_valid_region_id = nil,
+                    state = -1
+                }
+            end
         end
-        region_count = region_count + 1
-        last_valid_region_id = id
-      -- all points of the new rect fall within the region. no action should be taken
-      elseif count == 4 then
-        game.print(string.format("s=%s", "falls within region. no action."))
-        return {
-          valid_points = nil,
-          last_valid_region_id = nil,
-          state = -1
-        }
-      end
     end
-  end
-  -- check if we had a valid region
-  if last_valid_region_id ~= -1 then
-    game.print(string.format("s=%s", "valid intersection"))
-    game.print(serpent.block(valid_points))
-    return {
-      valid_points = valid_points,
-      last_valid_region_id = last_valid_region_id,
-      state = 1
-    }
-  else
-    game.print(string.format("s=%s", "not enough points intersecting. no action."))
-    return {
-      valid_points = valid_points,
-      last_valid_region_id = last_valid_region_id,
-      state = 0
-    }
-  end
+    -- check if we had a valid region
+    if last_valid_region_id ~= -1 then
+        game.print(string.format("s=%s", "valid intersection"))
+        game.print(serpent.block(valid_points))
+        return {
+            valid_points = valid_points,
+            last_valid_region_id = last_valid_region_id,
+            state = 1
+        }
+    else
+        game.print(string.format("s=%s", "not enough points intersecting. no action."))
+        return {
+            valid_points = valid_points,
+            last_valid_region_id = last_valid_region_id,
+            state = 0
+        }
+    end
 end
 
 local function remove_line_if_in_region(line_points, region)
-  for i, lp in pairs(line_points) do
-    game.print(serpent.block(l))
-    if point_in_region({x = lp.x1, y = lp.y1}, region) and point_in_region({x = lp.x2, y = lp.y2}, region) then
-      table.remove(line_points, i)
+    for i, lp in pairs(line_points) do
+        game.print(serpent.block(l))
+        if point_in_region({x = lp.x1, y = lp.y1}, region) and point_in_region({x = lp.x2, y = lp.y2}, region) then
+            table.remove(line_points, i)
+        end
     end
-  end
 end
 
-script.on_event(defines.events.on_player_selected_area, function(event)
-  if event.item ~= "region-marker-tool" then return end
+script.on_event(
+    defines.events.on_player_selected_area,
+    function(event)
+        if event.item ~= "region-marker-tool" then return end
 
-  local player = game.get_player(event.player_index)
-  if player.gui.screen.region_edit_dialog then return end
+        local player = game.get_player(event.player_index)
+        if player.gui.screen.region_edit_dialog then return end
 
-  local area = event.area
-  local width = area.right_bottom.x - area.left_top.x
-  local height = area.right_bottom.y - area.left_top.y
-  local click_tolerance = player.mod_settings["region-marker-click-tolerance"].value
+        local area = event.area
+        local width = area.right_bottom.x - area.left_top.x
+        local height = area.right_bottom.y - area.left_top.y
+        local click_tolerance = player.mod_settings["region-marker-click-tolerance"].value
 
-  if width <= click_tolerance and height <= click_tolerance then
-    -- Treat this as a click rather than a drag.
-    local point = {
-      x = (area.left_top.x + area.right_bottom.x) / 2,
-      y = (area.left_top.y + area.right_bottom.y) / 2,
-    }
-    local id = find_region_at(event.surface.index, point)
-    if id then
-      open_region_dialog(player, id)  -- defined in gui.lua
+        if width <= click_tolerance and height <= click_tolerance then
+            -- Treat this as a click rather than a drag.
+            local point = {
+                x = (area.left_top.x + area.right_bottom.x) / 2,
+                y = (area.left_top.y + area.right_bottom.y) / 2
+            }
+            local id = find_region_at(event.surface.index, point)
+            if id then open_region_dialog(player, id) end
+
+            return
+        end
+
+        -- construct all 4 bounds from a 2 point bounding box
+        local points = {
+            left_top = {x = area.left_top.x, y = area.left_top.y},
+            right_top = {x = area.right_bottom.x, y = area.left_top.y},
+            right_bottom = {x = area.right_bottom.x, y = area.right_bottom.y},
+            left_bottom = {x = area.left_top.x, y = area.right_bottom.y}
+        }
+
+        -- test if the drag intersects with an existing region
+        local intersection = points_intersect_region(points)
+
+        -- valid intersection
+        if intersection.state == 1 then
+            -- merge new rect with existing region
+            local region = storage.regions[intersection.last_valid_region_id]
+            local line_points = {
+                {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
+                {
+                    x1 = points.right_bottom.x,
+                    y1 = points.left_top.y,
+                    x2 = points.right_bottom.x,
+                    y2 = points.right_bottom.y
+                },
+                {
+                    x1 = points.right_bottom.x,
+                    y1 = points.right_bottom.y,
+                    x2 = points.left_top.x,
+                    y2 = points.right_bottom.y
+                },
+                {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y}
+            }
+
+            remove_line_if_in_region(line_points, region)
+
+            local rect = create_rect(player, region.color, event.surface.index, points, line_points)
+            table.insert(region.rects, rect)
+        elseif intersection.state == 0 then
+            -- create a new region and immediately prompt for a name.
+            create_region(player, event.surface.index, points)
+        else return end
     end
-    return
-  end
-
-  -- construct all 4 bounds from a 2 point bounding box
-  local points = {
-      left_top = {x = area.left_top.x, y = area.left_top.y},
-      right_top = {x = area.right_bottom.x, y = area.left_top.y},
-      right_bottom = {x = area.right_bottom.x, y = area.right_bottom.y},
-      left_bottom = {x = area.left_top.x, y = area.right_bottom.y},
-  }
-
-  -- test if the drag intersects with an existing region
-  local intersection = points_intersect_region(points)
-
-  -- valid intersection
-  if intersection.state == 1 then
-    -- merge new rect with existing region
-    local region = storage.regions[intersection.last_valid_region_id]
-    local line_points = {
-      {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
-      {x1 = points.right_bottom.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.right_bottom.y},
-      {x1 = points.right_bottom.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.right_bottom.y},
-      {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y},
-    }
-
-    remove_line_if_in_region(line_points, region)
-
-    local rect = create_rect(player, region.color, event.surface.index, points, line_points)
-    table.insert(region.rects, rect)
-  elseif intersection.state == 0 then
-    -- create a new region and immediately prompt for a name.
-    create_region(player, event.surface.index, points)
-  else return end
-end)
+)
