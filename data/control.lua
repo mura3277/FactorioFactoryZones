@@ -35,12 +35,7 @@ script.on_nth_tick(
 )
 
 local function point_in_area(point, area)
-    return point.x >= area.left_top.x and point.x <= area.right_bottom.x and point.y >= area.left_top.y and
-        point.y <= area.right_bottom.y
-end
-
-local function line_in_area(line, area)
-    return point_in_area({x = line.x1, y = line.y1}, area) and point_in_area({x = line.x2, y = line.y2}, area)
+    return point.x >= area.left_top.x and point.x <= area.right_bottom.x and point.y >= area.left_top.y and point.y <= area.right_bottom.y
 end
 
 local function point_in_region(point, region)
@@ -53,12 +48,7 @@ local function point_in_region(point, region)
 end
 
 local function line_in_region(line, region)
-    for _, r in pairs(region.rects) do
-        if line_in_area(line, r.area) then
-            return true
-        end
-    end
-    return false
+    return point_in_region({line.x1, line.y1}, region) and point_in_region({line.x2, line.y2}, region)
 end
 
 local function find_region_at(surface_index, point)
