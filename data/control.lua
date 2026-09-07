@@ -159,66 +159,44 @@ function destroy_region(region_id)
     storage.regions[region_id] = nil
 end
 
-local function points_intersect_region(points)
-    local valid_points = {}
-    local last_valid_region_id = -1
+local function lines_intersect_region(line_points)
     local region_count = 0
+    local state = {intersecting_lines = {}, intersecting_line_index = -1, last_valid_region_id = -1, result = -1}
     for id, region in pairs(storage.regions) do
         local count = 0
-        for _, p in pairs(points) do
-            if point_in_region(p, region) then
-                table.insert(valid_points, p)
+        --TODO escape searching regions with only one rect
+        for i, l in pairs(line_points) do
+            if point_in_region({x = l.x1, y = l.y1}, region) and point_in_region({x = l.x2, y = l.y2}, region) then
+                table.insert(state.intersecting_lines, l)
+                state.intersecting_line_index = i
                 count = count + 1
             end
             -- if we have enough intersections, store region id
-            if count == 2 then
+            if count == 1 then
                 -- all points of the new rect fall within the region. no action should be taken
                 -- early escape if new drag covers multiple regions
-                if region_count > 0 and last_valid_region_id ~= id then
+                if region_count > 0 and state.last_valid_region_id ~= id then
                     game.print(string.format("s=%s", "covers multiple regions. no action."))
-                    return {
-                        valid_points = nil,
-                        last_valid_region_id = nil,
-                        state = -1
-                    }
+                    return state
                 end
                 region_count = region_count + 1
-                last_valid_region_id = id
+                state.last_valid_region_id = id
             elseif count == 4 then
                 game.print(string.format("s=%s", "falls within region. no action."))
-                return {
-                    valid_points = nil,
-                    last_valid_region_id = nil,
-                    state = -1
-                }
+                return state
             end
         end
     end
     -- check if we had a valid region
-    if last_valid_region_id ~= -1 then
+    if state.last_valid_region_id ~= -1 then
         game.print(string.format("s=%s", "valid intersection"))
-        game.print(serpent.block(valid_points))
-        return {
-            valid_points = valid_points,
-            last_valid_region_id = last_valid_region_id,
-            state = 1
-        }
+        game.print(serpent.block(state.intersecting_lines))
+        state.result = 1
+        return state
     else
         game.print(string.format("s=%s", "not enough points intersecting. no action."))
-        return {
-            valid_points = valid_points,
-            last_valid_region_id = last_valid_region_id,
-            state = 0
-        }
-    end
-end
-
-local function remove_line_if_in_region(line_points, region)
-    for i, lp in pairs(line_points) do
-        game.print(serpent.block(l))
-        if point_in_region({x = lp.x1, y = lp.y1}, region) and point_in_region({x = lp.x2, y = lp.y2}, region) then
-            table.remove(line_points, i)
-        end
+        state.result = 0
+        return state
     end
 end
 
@@ -243,7 +221,6 @@ script.on_event(
             }
             local id = find_region_at(event.surface.index, point)
             if id then open_region_dialog(player, id) end
-
             return
         end
 
@@ -254,36 +231,28 @@ script.on_event(
             right_bottom = {x = area.right_bottom.x, y = area.right_bottom.y},
             left_bottom = {x = area.left_top.x, y = area.right_bottom.y}
         }
+        local line_points = {
+            {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
+            {x1 = points.right_bottom.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.right_bottom.y},
+            {x1 = points.right_bottom.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.right_bottom.y},
+            {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y}
+        }
 
         -- test if the drag intersects with an existing region
-        local intersection = points_intersect_region(points)
+        local intersection = lines_intersect_region(line_points)
 
         -- valid intersection
-        if intersection.state == 1 then
+        if intersection.result == 1 then
             -- merge new rect with existing region
             local region = storage.regions[intersection.last_valid_region_id]
-            local line_points = {
-                {x1 = points.left_top.x, y1 = points.left_top.y, x2 = points.right_bottom.x, y2 = points.left_top.y},
-                {
-                    x1 = points.right_bottom.x,
-                    y1 = points.left_top.y,
-                    x2 = points.right_bottom.x,
-                    y2 = points.right_bottom.y
-                },
-                {
-                    x1 = points.right_bottom.x,
-                    y1 = points.right_bottom.y,
-                    x2 = points.left_top.x,
-                    y2 = points.right_bottom.y
-                },
-                {x1 = points.left_top.x, y1 = points.right_bottom.y, x2 = points.left_top.x, y2 = points.left_top.y}
-            }
 
-            remove_line_if_in_region(line_points, region)
+            -- get line that was removed
+            removed_line = intersection.intersecting_lines[1]
+            table.remove(line_points, intersection.intersecting_line_index)
 
             local rect = create_rect(player, region.color, event.surface.index, points, line_points)
             table.insert(region.rects, rect)
-        elseif intersection.state == 0 then
+        elseif intersection.result == 0 then
             -- create a new region and immediately prompt for a name.
             create_region(player, event.surface.index, points)
         else return end
