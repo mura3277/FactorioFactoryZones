@@ -1,8 +1,6 @@
 function build_visibility_button(player)
     if player.gui.screen.region_visibility_button then return end
-
-    local button =
-        player.gui.screen.add {
+    local button = player.gui.screen.add {
         type = "button",
         name = "region_visibility_button",
         caption = storage.regions_visible and "Hide Regions" or "Show Regions"
@@ -13,20 +11,16 @@ end
 
 local function set_all_regions_visible(visible)
     storage.regions_visible = visible
-
     for _, region in pairs(storage.regions) do
         for _, r in pairs(region.rects) do
             for _, l in pairs(r.lines) do
-                if l and l.valid then
-                    l.visible = visible
-                end
+                if l and l.valid then l.visible = visible end
             end
+            r.rect_trans.visible = visible
         end
-
         local text = rendering.get_object_by_id(region.text_render_id)
         if text and text.valid then text.visible = visible end
     end
-
     for _, player in pairs(game.connected_players) do
         local button = player.gui.screen.region_visibility_button
         if button then button.caption = visible and "Hide Regions" or "Show Regions" end
@@ -49,6 +43,7 @@ local function apply_region_color(region)
             if l and l.valid then
                 l.color = {r = region.color.r, g = region.color.g, b = region.color.b, 255}
             end
+            r.rect_trans.color = construct_region_color(region.color)
         end
     end
 end
@@ -67,8 +62,7 @@ local function add_channel_row(parent, region_id, channel, initial_value)
     local label = row.add {type = "label", caption = channel:upper()}
     label.style.width = 12
 
-    local slider =
-        row.add {
+    local slider = row.add {
         type = "slider",
         name = "slider",
         tags = {action = "set_color_channel", region_id = region_id, channel = channel}
@@ -79,8 +73,7 @@ local function add_channel_row(parent, region_id, channel, initial_value)
     slider.set_slider_discrete_values(true)
     slider.slider_value = initial_value
 
-    local field =
-        row.add {
+    local field = row.add {
         type = "textfield",
         name = "field",
         numeric = true,
@@ -99,8 +92,7 @@ function open_region_dialog(player, region_id)
     local existing = player.gui.screen.region_edit_dialog
     if existing then existing.destroy() end
 
-    local frame =
-        player.gui.screen.add {
+    local frame = player.gui.screen.add {
         type = "frame",
         name = "region_edit_dialog",
         caption = "Edit region",
@@ -112,8 +104,7 @@ function open_region_dialog(player, region_id)
     local name_row = frame.add {type = "flow", direction = "horizontal"}
     name_row.style.vertical_align = "center"
 
-    local name_field =
-        name_row.add {
+    local name_field = name_row.add {
         type = "textfield",
         text = region.name,
         tags = {action = "rename_region", region_id = region_id}
@@ -130,8 +121,7 @@ function open_region_dialog(player, region_id)
         tags = {action = "delete_region", region_id = region_id}
     }
 
-    local color_frame =
-        frame.add {
+    local color_frame = frame.add {
         type = "frame",
         direction = "vertical",
         style = "inside_shallow_frame_with_padding"
@@ -154,8 +144,7 @@ function open_region_dialog(player, region_id)
     }
 end
 
-script.on_event(
-    defines.events.on_gui_click,
+script.on_event(defines.events.on_gui_click,
     function(event)
         local element = event.element
         if not (element and element.valid) then return end
@@ -180,9 +169,7 @@ script.on_event(
     end
 )
 
---TODO merge this function with on_gui_text_changed
-script.on_event(
-    defines.events.on_gui_value_changed,
+script.on_event(defines.events.on_gui_value_changed, --TODO merge this function with on_gui_text_changed
     function(event)
         local element = event.element
         if not (element and element.valid and element.tags and element.tags.action == "set_color_channel") then
@@ -204,8 +191,7 @@ script.on_event(
     end
 )
 
-script.on_event(
-    defines.events.on_gui_text_changed,
+script.on_event(defines.events.on_gui_text_changed,
     function(event)
         local element = event.element
         if not (element and element.valid and element.tags and element.tags.action) then
@@ -239,8 +225,7 @@ script.on_event(
     end
 )
 
-script.on_event(
-    defines.events.on_gui_closed,
+script.on_event(defines.events.on_gui_closed,
     function(event)
         if event.element and event.element.valid and event.element.name == "region_edit_dialog" then
             event.element.destroy()
