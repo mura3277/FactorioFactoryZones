@@ -84,10 +84,7 @@ local function create_region(player, surface_index, line_points, area)
     local text = rendering.draw_text {
         text = name,
         color = {r = 255, g = 255, b = 255},
-        target = { --TODO label pos needs to use the first point in points table instead of area
-            x = (line_points[1].x1 + line_points[1].x2) / 2,
-            y = line_points[1].y1 - 0.5 -- just above the top edge of the rectangle
-        },
+        target = { x = (area.left_top.x + area.right_bottom.x) / 2, y = area.left_top.y - 0.5},
         surface = game.surfaces[surface_index],
         render_mode = "chart",
         alignment = "center",
@@ -152,7 +149,7 @@ local function lines_intersect_region(line_points)
     end
 end
 
-function line_intersect_point(x1, y1, x2, y2, x3, y3, x4, y4)
+function line_intersect_point(x1, y1, x2, y2, x3, y3, x4, y4) -- 2dengine.com/doc/intersections/?captcha=1#Segment_vs_segment
   local dx1, dy1 = x2 - x1, y2 - y1
   local dx2, dy2 = x4 - x3, y4 - y3
   local d = dx1*dy2 - dy1*dx2
@@ -184,6 +181,7 @@ local function shift_intersected_points(intersection, line_points, area)
                         lp.x2 = intersect_point.x
                         area.right_bottom.x = intersect_point.x
                     end
+                    --TODO reconstruct intersected_line vertex positions
                 end
             end
         end
@@ -225,8 +223,6 @@ script.on_event(
             table.remove(line_points, intersection.intersecting_line_index) -- get line that was removed
             shift_intersected_points(intersection, line_points, event.area)
             local rect = create_rect(player, region.color, event.surface.index, line_points, event.area)
-
-            --TODO reconstruct intersected_line vertex positions
             table.insert(region.rects, rect)
         elseif intersection.result == 0 then
             -- create a new region and immediately prompt for a name.
