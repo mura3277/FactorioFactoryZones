@@ -149,24 +149,24 @@ local function lines_intersect_region(line_points)
     end
 end
 
-function line_intersect_point(x1, y1, x2, y2, x3, y3, x4, y4) -- 2dengine.com/doc/intersections/?captcha=1#Segment_vs_segment
-  local dx1, dy1 = x2 - x1, y2 - y1
-  local dx2, dy2 = x4 - x3, y4 - y3
+local function line_intersect_point(a, b) -- 2dengine.com/doc/intersections/?captcha=1#Segment_vs_segment
+  local dx1, dy1 = a.x2 - a.x1, a.y2 - a.y1
+  local dx2, dy2 = b.x2 - b.x1, b.y2 - b.y1
   local d = dx1*dy2 - dy1*dx2
   if d == 0 then return nil end
-  local dx3, dy3 = x1 - x3, y1 - y3
+  local dx3, dy3 = a.x1 - b.x1, a.y1 - b.y1
   local t1 = (dx2*dy3 - dy2*dx3)/d
   if t1 < 0 or t1 > 1 then return nil end
   local t2 = (dx1*dy3 - dy1*dx3)/d
   if t2 < 0 or t2 > 1 then return nil end
-  return {x = x1 + t1*dx1, y = y1 + t1*dy1} -- point of intersection
+  return {x = a.x1 + t1*dx1, y = a.y1 + t1*dy1} -- point of intersection
 end
 
 local function shift_intersected_points(intersection, line_points, area)
     for _, lp in pairs(line_points) do
         for _,r in pairs(storage.regions[intersection.last_valid_region_id].rects) do
             for _,l in pairs(r.line_points) do
-                intersect_point = line_intersect_point(lp.x1, lp.y1, lp.x2, lp.y2, l.x1, l.y1, l.x2, l.y2)
+                local intersect_point = line_intersect_point(lp, l)
                 if intersect_point then -- we found which line in the region we crossed
                     if l.dir == 1 then -- shift vertex positions and shift area vector
                         lp.y2 = intersect_point.y
